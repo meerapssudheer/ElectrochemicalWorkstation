@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Three-electrode electrochemical sensor</title>
+<style>
+:root{--bg:#eef2f4;--card:#fff;--fg:#17212b;--mut:#566271;--line:#d3dae1;--acc:#0f766e;--o:#e59a0b;--r:#1e7fc4;--cur:#c2255c;--sol:#d6ebf5;--glass:#8497ab;--btn:#0f766e;--btnfg:#fff;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e1419;--card:#161e26;--fg:#e6edf3;--mut:#9aa8b6;--line:#28333f;--acc:#4fd1c5;--o:#f2b73b;--r:#58b4f2;--cur:#ff6b9a;--sol:#17324a;--glass:#5d7188;--btn:#4fd1c5;--btnfg:#07201d;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0e1419;--card:#161e26;--fg:#e6edf3;--mut:#9aa8b6;--line:#28333f;--acc:#4fd1c5;--o:#f2b73b;--r:#58b4f2;--cur:#ff6b9a;--sol:#17324a;--glass:#5d7188;--btn:#4fd1c5;--btnfg:#07201d;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:1120px;margin:0 auto;padding:22px 16px 40px}
+h1{font:700 1.7rem/1.2 Georgia,"Times New Roman",serif;margin:0 0 6px}
+h2{font:600 1.05rem/1.3 system-ui,sans-serif;margin:0 0 10px}
+.sub{color:var(--mut);margin:0 0 18px;max-width:70ch}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,460px),1fr));gap:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px}
+canvas{width:100%;height:auto;display:block}
+.leg{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:.84rem;color:var(--mut);margin-top:8px}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+label{display:flex;justify-content:space-between;font-size:.92rem;margin-top:12px}
+label b{font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;accent-color:var(--acc)}
+.btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+button{font:inherit;font-weight:600;padding:8px 16px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--fg);cursor:pointer}
+button.p{background:var(--btn);color:var(--btnfg);border-color:var(--btn)}
+button:focus-visible,input:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.chk{justify-content:flex-start;gap:8px;align-items:center}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:16px}
+.stats div{border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:.82rem;color:var(--mut)}
+.stats b{display:block;color:var(--fg);font-size:.98rem;font-variant-numeric:tabular-nums}
+.roles{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:12px}
+.roles div{border-left:4px solid var(--acc);padding:2px 0 2px 12px}
+.roles p,.note{margin:4px 0 0;color:var(--mut);font-size:.92rem}
+.wide{grid-column:1/-1}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>Three-electrode electrochemical sensor</h1>
+<p class="sub">A potentiostat sweeps the potential of the working electrode and records the current that flows. Here the analyte is ferricyanide, Fe(CN)₆³⁻, which gains one electron at the surface of the working electrode. Press <b>Run scan</b> and change the concentration to see the sensor respond.</p>
+
+<div class="grid">
+ <section class="card" aria-label="Electrochemical cell">
+  <h2>The cell</h2>
+  <canvas id="cell" role="img" aria-label="Animated diagram of a beaker with working, reference and counter electrodes connected to a potentiostat"></canvas>
+  <div class="leg"><span><i class="dot" style="background:var(--o)"></i>Fe(CN)₆³⁻ (oxidised)</span><span><i class="dot" style="background:var(--r)"></i>Fe(CN)₆⁴⁻ (reduced)</span><span><i class="dot" style="background:#ffd54a"></i>electrons in the wires</span></div>
+ </section>
+
+ <section class="card" aria-label="Controls">
+  <h2>Controls</h2>
+  <label for="conc">Analyte concentration <b id="oc"></b></label>
+  <input id="conc" type="range" min="0" max="10" step="0.5" value="5">
+  <label for="rate">Scan rate <b id="or"></b></label>
+  <input id="rate" type="range" min="10" max="200" step="10" value="50">
+  <label for="speed">Animation speed <b id="os"></b></label>
+  <input id="speed" type="range" min="1" max="10" step="1" value="5">
+  <label class="chk"><input id="noise" type="checkbox"> Add measurement noise</label>
+  <div class="btns"><button class="p" id="run">Run scan</button><button id="rst">Reset scan</button><button id="clr">Clear calibration</button></div>
+  <div class="stats">
+   <div>Applied potential E<b id="rE">—</b></div>
+   <div>Measured current i<b id="rI">—</b></div>
+   <div>Cathodic peak<b id="rPc">—</b></div>
+   <div>Anodic peak<b id="rPa">—</b></div>
+   <div class="wide">Peak separation ΔEp (about 59 mV for a reversible one-electron couple)<b id="rD">—</b></div>
+  </div>
+ </section>
+
+ <section class="card" aria-label="Voltammogram">
+  <h2>Cyclic voltammogram</h2>
+  <canvas id="cv" role="img" aria-label="Current versus potential plot drawn as the scan runs"></canvas>
+  <p class="note">The scan starts at +0.70 V, sweeps down to −0.10 V and back. The cathodic peak is where Fe(CN)₆³⁻ is reduced faster than fresh analyte can diffuse in.</p>
+ </section>
+
+ <section class="card" aria-label="Calibration">
+  <h2>Calibration curve</h2>
+  <canvas id="cal" role="img" aria-label="Peak current versus concentration with a straight-line fit"></canvas>
+  <p class="note">Each finished scan adds a point. Peak current rises in proportion to concentration (Randles–Ševčík), so the slope is the sensitivity. Keep the scan rate fixed while you collect points.</p>
+ </section>
+
+ <section class="card wide">
+  <h2>What each electrode does</h2>
+  <div class="roles">
+   <div><b>Working electrode (WE)</b><p>The sensing surface. The analyte reacts here, and the current from that reaction is the signal.</p></div>
+   <div><b>Reference electrode (RE)</b><p>Ag/AgCl holds a fixed, stable potential. The potentiostat measures the WE against it and draws almost no current through it.</p></div>
+   <div><b>Counter electrode (CE)</b><p>A platinum wire that completes the circuit. It carries the current, so the opposite reaction happens here and the WE and RE stay undisturbed.</p></div>
+  </div>
+ </section>
+</div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id),css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const F=96485,Rg=8.314,T=298.15,ff=F/(Rg*T),A=0.07,D=7e-6,E0=0.22,Ehi=0.7,Elo=-0.1,N=500,dt=0.01,lam=0.45,dx=Math.sqrt(D*dt/lam),Cdl=20e-6;
+function ctx(id){const c=$(id),d=Math.min(devicePixelRatio||1,2);c.width=640*d;c.height=420*d;const x=c.getContext("2d");x.scale(d,d);return x}
+const cc=ctx("cell"),cv=ctx("cv"),ca=ctx("cal");
+let CO,CR,tO,tR,E,dir,v,conc,run=false,done=false,pts=[],ipc,ipa,Epc,Epa,ymax=10,lastI=0,ph=0,cal=[],P=[];
+
+function out(){$("oc").textContent=(+$("conc").value).toFixed(1)+" mM";$("or").textContent=$("rate").value+" mV/s";$("os").textContent=$("speed").value+"×"}
+function reset(){
+ conc=+$("conc").value;v=+$("rate").value/1000;
+ CO=new Float64Array(N).fill(conc*1e-6);CR=new Float64Array(N);tO=new Float64Array(N);tR=new Float64Array(N);
+ E=Ehi;dir=-1;pts=[];ipc=0;ipa=-1e9;Epc=Epa=null;done=false;lastI=0;
+ ymax=Math.max(5,(2.69e5*A*Math.sqrt(D)*conc*1e-6*Math.sqrt(v)*1e6+20*v)*1.3);
+ P=[];const n=Math.round(conc*9);for(let k=0;k<n;k++)P.push({x:100+Math.random()*440,y:212+Math.random()*184,o:true});
+ $("run").textContent=run?"Pause":"Run scan";
+}
+function finish(){
+ run=false;done=true;$("run").textContent="Run scan";
+ if(conc>0){const m=Math.abs(ipc),ex=cal.find(p=>p.c===conc&&p.v===v);ex?ex.i=m:cal.push({c:conc,v,i:m})}
+}
+function step(){
+ const e=Math.exp(ff*(E-E0)),S=CO[1]+CR[1];
+ CO[0]=S*e/(1+e);CR[0]=S-CO[0];
+ let i=-F*A*D*(CO[1]-CO[0])/dx*1e6+dir*Cdl*v*1e6;
+ if($("noise").checked)i+=(Math.random()-.5)*0.6;
+ pts.push([E,i]);lastI=i;
+ if(i<ipc){ipc=i;Epc=E}
+ if(dir>0&&i>ipa){ipa=i;Epa=E}
+ for(let k=1;k<N-1;k++){
+  tO[k]=CO[k]+lam*(CO[k-1]-2*CO[k]+CO[k+1]);
+  tR[k]=CR[k]+lam*(CR[k-1]-2*CR[k]+CR[k+1]);
+ }
+ tO[0]=CO[0];tR[0]=CR[0];tO[N-1]=conc*1e-6;tR[N-1]=0;
+ [CO,tO]=[tO,CO];[CR,tR]=[tR,CR];
+ E+=dir*v*dt;
+ if(dir<0&&E<=Elo){E=Elo;dir=1}
+ else if(dir>0&&E>=Ehi){E=Ehi;finish()}
+}
+function moveP(){
+ const pO=1/(1+Math.exp(-ff*(E-E0)));
+ for(const p of P){
+  p.x=Math.max(100,Math.min(540,p.x+(Math.random()-.5)*3.2));
+  p.y=Math.max(212,Math.min(398,p.y+(Math.random()-.5)*3.2));
+  if(!run)continue;
+  if(Math.hypot(p.x-320,p.y-318)<28&&Math.random()<.2)p.o=Math.random()<pO;
+  if(Math.hypot(p.x-220,p.y-343)<28&&Math.abs(lastI)>.3&&Math.random()<.2)p.o=lastI<0;
+ }
+}
+function drawCell(){
+ const c=cc,fg=css("--fg"),mut=css("--mut");
+ c.clearRect(0,0,640,420);
+ c.fillStyle=css("--card");c.strokeStyle=fg;c.lineWidth=2;c.beginPath();c.roundRect(170,10,300,72,10);c.fill();c.stroke();
+ c.fillStyle=fg;c.textAlign="center";c.font="600 13px system-ui";c.fillText("Potentiostat",320,30);
+ c.font="12px system-ui";c.fillStyle=mut;c.fillText("E = "+E.toFixed(3)+" V   i = "+lastI.toFixed(1)+" µA",320,52);
+ c.fillText(done?"scan complete":run?"scanning "+(dir<0?"negative":"positive"):"idle",320,70);
+ c.fillStyle=css("--sol");c.fillRect(92,200,456,210);
+ c.strokeStyle=css("--glass");c.lineWidth=4;c.beginPath();c.moveTo(90,150);c.lineTo(90,410);c.lineTo(550,410);c.lineTo(550,150);c.stroke();
+ for(const p of P){c.fillStyle=css(p.o?"--o":"--r");c.beginPath();c.arc(p.x,p.y,3.6,0,7);c.fill()}
+ const el=[{x:220,tip:345,n:"CE",s:"Pt wire",col:"#8d97a6"},{x:320,tip:320,n:"WE",s:"Gold disc",col:"#d9a521"},{x:420,tip:315,n:"RE",s:"Ag/AgCl",col:"#c9d1da"}];
+ for(const e of el){
+  c.strokeStyle=fg;c.lineWidth=3;c.beginPath();c.moveTo(e.x,82);c.lineTo(e.x,165);c.stroke();
+  c.strokeStyle=css("--glass");c.lineWidth=10;c.beginPath();c.moveTo(e.x,160);c.lineTo(e.x,e.tip-8);c.stroke();
+  c.fillStyle=e.col;c.strokeStyle=fg;c.lineWidth=1;c.fillRect(e.x-6,e.tip-8,12,12);c.strokeRect(e.x-6,e.tip-8,12,12);
+  c.fillStyle=fg;c.textAlign="center";c.font="700 13px system-ui";c.fillText(e.n,e.x,e.tip+22);
+  c.font="11px system-ui";c.fillStyle=mut;c.fillText(e.s,e.x,e.tip+36);
+  c.beginPath();c.arc(e.x,82,4,0,7);c.fillStyle=fg;c.fill();
+ }
+ c.fillStyle=mut;c.font="11px system-ui";c.fillText("≈ 0 current",420,130);
+ const a=Math.min(1,Math.abs(lastI)/(ymax*.25));
+ c.fillStyle="#ffd54a";c.globalAlpha=.25+.75*a;
+ for(let k=0;k<6;k++){
+  const f=((ph+k/6)%1+1)%1;
+  c.beginPath();c.arc(320,90+75*f,3.5,0,7);c.fill();
+  c.beginPath();c.arc(220,90+75*(1-f),3.5,0,7);c.fill();
+ }
+ c.globalAlpha=1;
+ c.fillStyle=mut;c.font="11px system-ui";c.textAlign="left";
+ c.fillText(lastI<-.3?"e⁻ into WE (reduction)":lastI>.3?"e⁻ out of WE (oxidation)":"",332,124);
+ c.textAlign="right";c.fillText(lastI<-.3?"oxidation at CE":lastI>.3?"reduction at CE":"",208,124);
+}
+function axes(c,l,t,w,h,xl,yl){
+ c.strokeStyle=css("--line");c.fillStyle=css("--mut");c.lineWidth=1;c.font="11px system-ui";c.strokeRect(l,t,w,h);
+ c.textAlign="center";c.fillText(xl,l+w/2,t+h+38);
+ c.save();c.translate(14,t+h/2);c.rotate(-Math.PI/2);c.fillText(yl,0,0);c.restore();
+}
+function drawCV(){
+ const c=cv,l=58,t=16,w=565,h=340,x0=-.15,x1=.75,X=e=>l+(e-x0)/(x1-x0)*w,Y=i=>t+h/2-i/ymax*h/2;
+ c.clearRect(0,0,640,420);axes(c,l,t,w,h,"E vs Ag/AgCl (V)","i (µA)");
+ c.textAlign="center";
+ for(let e=-.1;e<.7001;e+=.1){c.strokeStyle=css("--line");c.beginPath();c.moveTo(X(e),t);c.lineTo(X(e),t+h);c.stroke();c.fillStyle=css("--mut");c.fillText(e.toFixed(1),X(e),t+h+14)}
+ c.textAlign="right";
+ for(const k of[-1,-.5,0,.5,1]){const i=k*ymax;c.strokeStyle=k?css("--line"):css("--mut");c.beginPath();c.moveTo(l,Y(i));c.lineTo(l+w,Y(i));c.stroke();c.fillStyle=css("--mut");c.fillText(i.toFixed(ymax<10?1:0),l-6,Y(i)+4)}
+ c.setLineDash([4,4]);c.strokeStyle=css("--acc");c.beginPath();c.moveTo(X(E0),t);c.lineTo(X(E0),t+h);c.stroke();c.setLineDash([]);
+ c.fillStyle=css("--acc");c.textAlign="left";c.fillText("E°′ = 0.22 V",X(E0)+4,t+12);
+ if(pts.length){
+  c.strokeStyle=css("--cur");c.lineWidth=2;c.lineJoin="round";c.beginPath();
+  pts.forEach((p,k)=>k?c.lineTo(X(p[0]),Y(p[1])):c.moveTo(X(p[0]),Y(p[1])));c.stroke();
+  const q=pts[pts.length-1];c.fillStyle=css("--cur");c.beginPath();c.arc(X(q[0]),Y(q[1]),4.5,0,7);c.fill();
+  c.fillStyle=css("--fg");c.font="600 11px system-ui";
+  if(Epc!==null){c.beginPath();c.arc(X(Epc),Y(ipc),3,0,7);c.fill();c.fillText("ipc",X(Epc)+6,Y(ipc)+4)}
+  if(ipa>-1e8){c.beginPath();c.arc(X(Epa),Y(ipa),3,0,7);c.fill();c.fillText("ipa",X(Epa)+6,Y(ipa)-4)}
+ }
+}
+function drawCal(){
+ const c=ca,l=58,t=16,w=565,h=340,d=cal.filter(p=>p.v===v),ym=Math.max(10,...d.map(p=>p.i*1.25)),X=x=>l+x/10*w,Y=y=>t+h-y/ym*h;
+ c.clearRect(0,0,640,420);axes(c,l,t,w,h,"Concentration (mM)","Cathodic peak current |ipc| (µA)");
+ c.fillStyle=css("--mut");c.textAlign="center";
+ for(let x=0;x<=10;x+=2){c.fillText(x,X(x),t+h+14)}
+ c.textAlign="right";for(let k=0;k<=4;k++){const y=ym*k/4;c.fillText(y.toFixed(0),l-6,Y(y)+4);c.strokeStyle=css("--line");c.beginPath();c.moveTo(l,Y(y));c.lineTo(l+w,Y(y));c.stroke()}
+ if(d.length>1){
+  const n=d.length,sx=d.reduce((a,p)=>a+p.c,0),sy=d.reduce((a,p)=>a+p.i,0),sxy=d.reduce((a,p)=>a+p.c*p.i,0),sxx=d.reduce((a,p)=>a+p.c*p.c,0),den=n*sxx-sx*sx;
+  if(den){const m=(n*sxy-sx*sy)/den,b=(sy-m*sx)/n;
+   c.strokeStyle=css("--acc");c.lineWidth=2;c.setLineDash([6,4]);c.beginPath();c.moveTo(X(0),Y(b));c.lineTo(X(10),Y(b+m*10));c.stroke();c.setLineDash([]);
+   c.fillStyle=css("--acc");c.textAlign="left";c.font="600 12px system-ui";c.fillText("sensitivity ≈ "+m.toFixed(1)+" µA/mM",l+10,t+20)}
+ }else{c.fillStyle=css("--mut");c.textAlign="left";c.font="12px system-ui";c.fillText("Finish scans at two or more concentrations to see the fit.",l+10,t+20)}
+ c.fillStyle=css("--cur");for(const p of d){c.beginPath();c.arc(X(p.c),Y(p.i),5,0,7);c.fill()}
+}
+function info(){
+ const f=(x,n=2)=>x.toFixed(n);
+ $("rE").textContent=f(E,3)+" V";$("rI").textContent=f(lastI,1)+" µA";
+ $("rPc").textContent=Epc===null?"—":f(ipc,1)+" µA at "+f(Epc,3)+" V";
+ $("rPa").textContent=ipa<-1e8?"—":f(ipa,1)+" µA at "+f(Epa,3)+" V";
+ $("rD").textContent=(Epa===null||Epc===null)?"—":Math.round((Epa-Epc)*1000)+" mV";
+}
+function loop(){
+ if(run){const n=+$("speed").value*2;for(let k=0;k<n&&run;k++)step();ph+=Math.max(-.05,Math.min(.05,-lastI/ymax*.06))}
+ moveP();drawCell();drawCV();drawCal();info();requestAnimationFrame(loop);
+}
+["conc","rate"].forEach(id=>$(id).addEventListener("input",()=>{out();reset()}));
+$("speed").addEventListener("input",out);
+$("run").onclick=()=>{if(done)reset();run=!run;$("run").textContent=run?"Pause":(pts.length?"Resume":"Run scan")};
+$("rst").onclick=()=>{run=false;reset();$("run").textContent="Run scan"};
+$("clr").onclick=()=>{cal=[]};
+out();reset();loop();
+</script>
+</body>
+</html>
